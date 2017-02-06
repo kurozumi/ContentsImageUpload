@@ -196,7 +196,7 @@ class ContentsImageUpload extends SC_Plugin_Base
                 // パラメーター初期化
                 $this->lfInitFormParam_UploadImage($objFormParam);
                 $this->lfInitFormParam($objFormParam, $_POST);
-                $arrForm = $this->lfSetViewParam_ConfirmPage($objUpFile, $objFormParam->getHashArray());
+                $arrForm = $this->lfSetViewParam_InputPage($objUpFile, $objFormParam->getHashArray());
                 $objPage->arrForm = array_merge($objPage->arrForm, $arrForm);
 
                 if(!$objPage->arrErr) {
@@ -207,6 +207,8 @@ class ContentsImageUpload extends SC_Plugin_Base
     
                     
                 }
+                
+                $arrForm['arrFile'] = $objUpFile->getFormFileList(IMAGE_TEMP_URLPATH, IMAGE_SAVE_URLPATH);
                 
                 print_r($objPage->arrForm);
                 
@@ -333,7 +335,91 @@ class ContentsImageUpload extends SC_Plugin_Base
         $arrForm['arrFile'] = $objUpFile->getFormFileList(IMAGE_TEMP_URLPATH, IMAGE_SAVE_URLPATH);
 
         return $arrForm;
-    }    
+    }
+    
+    /**
+     * フォームパラメーター取得
+     * - 編集/複製モード
+     *
+     * @param  SC_UploadFile_Ex  $objUpFile   SC_UploadFileインスタンス
+     * @param  integer $product_id  商品ID
+     * @return array   フォームパラメーター配列
+     */
+    public function lfGetFormParam_PreEdit(&$objUpFile, $news_id)
+    {
+        $arrForm = array();
+
+        // DBから商品データ取得
+        $arrForm = $this->lfGetProductData_FromDB($news_id);
+        // DBデータから画像ファイル名の読込
+        $objUpFile->setDBFileList($arrForm);
+
+        return $arrForm;
+    }
+    
+    /**
+     * DBから商品データを取得する
+     *
+     * @param  integer $news_id ニュースID
+     * @return string   商品データ配列
+     */
+    public function lfGetProductData_FromDB($news_id)
+    {
+        $objQuery =& SC_Query_Ex::getSingletonInstance();
+        $arrProduct = array();
+
+        // 商品データ取得
+        $col = '*';
+        $table = <<< __EOF__
+            dtb_products AS T1
+            LEFT JOIN (
+                SELECT product_id AS product_id_sub,
+                    product_code,
+                    price01,
+                    price02,
+                    deliv_fee,
+                    stock,
+                    stock_unlimited,
+                    sale_limit,
+                    point_rate,
+                    product_type_id,
+                    down_filename,
+                    down_realfilename
+                FROM dtb_products_class
+            ) AS T2
+                ON T1.product_id = T2.product_id_sub
+__EOF__;
+        $where = 'product_id = ?';
+        $objQuery->setLimit('1');
+        $arrProduct = $objQuery->select($col, $table, $where, array($product_id));
+
+        // カテゴリID取得
+        $col = 'category_id';
+        $table = 'dtb_product_categories';
+        $where = 'product_id = ?';
+        $objQuery->setOption('');
+        $arrProduct[0]['category_id'] = $objQuery->getCol($col, $table, $where, array($product_id));
+
+        // 規格情報ありなしフラグ取得
+        $objDb = new SC_Helper_DB_Ex();
+        $arrProduct[0]['has_product_class'] = $objDb->sfHasProductClass($product_id);
+
+        // 規格が登録されていなければ規格ID取得
+        if ($arrProduct[0]['has_product_class'] == false) {
+            $arrProduct[0]['product_class_id'] = SC_Utils_Ex::sfGetProductClassId($product_id, '0', '0');
+        }
+
+        // 商品ステータス取得
+        $objProduct = new SC_Product_Ex();
+        $productStatus = $objProduct->getProductStatus(array($product_id));
+        $arrProduct[0]['product_status'] = $productStatus[$product_id];
+
+        // 関連商品データ取得
+        $arrRecommend = $this->lfGetRecommendProductsData_FromDB($product_id);
+        $arrProduct[0] = array_merge($arrProduct[0], $arrRecommend);
+
+        return $arrProduct[0];
+    }
     
     /**
      * アップロードファイルを保存する
