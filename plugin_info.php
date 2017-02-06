@@ -34,13 +34,13 @@
 class plugin_info
 {
     /** プラグインコード(必須)：システム上でのキーとなります。プラグインコードは一意である必要があります。 */
-    static $PLUGIN_CODE = "ContentsImageUpload";
+    static $PLUGIN_CODE = "NewsImage";
 
     /** プラグイン名(必須)：プラグイン管理・画面出力（エラーメッセージetc）にはこの値が出力されます。 */
     static $PLUGIN_NAME = "新着情報画像プラグイン";
 
     /** プラグインメインクラス名(必須)：本体がプラグインを実行する際に呼ばれるクラス。拡張子は不要です。 */
-    static $CLASS_NAME = "ContentsImageUpload";
+    static $CLASS_NAME = "NewsImage";
 
     /** プラグインバージョン(必須) */
     static $PLUGIN_VERSION = "1.0.0";

@@ -31,7 +31,7 @@
  * @author LOCKON CO.,LTD.
  * @version $Id: $
  */
-class ContentsImageUpload extends SC_Plugin_Base
+class NewsImage extends SC_Plugin_Base
 {
     /**
      * コンストラクタ
@@ -564,7 +564,7 @@ __EOF__;
             default:
                 // 管理画面編集
                 if (strpos($filename, "contents/index.tpl") !== false) {
-                    $template_path = 'contents/plg_ContentsImageUpload_form.tpl';
+                    $template_path = 'contents/plg_NewsImage_form.tpl';
                     $template = "<!--{include file='{$template_path}'}-->";
                     $objTransform->select('form', 0)->replaceElement($template);
                 }
