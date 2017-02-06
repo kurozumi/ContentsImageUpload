@@ -26,7 +26,7 @@
         <input type="hidden" name="<!--{$smarty.const.TRANSACTION_ID_NAME}-->" value="<!--{$transactionid}-->" />
         <input type="hidden" name="mode" value="" />
         <input type="hidden" name="news_id" value="<!--{$arrForm.news_id.value|default:$tpl_news_id|h}-->" />
-        <input type="hidden" name="image_key" value="" />
+        <input type="hidden" name="image_key" value="<!--{$arrForm.image_key|h}-->" />
         <!--{foreach key=key item=item from=$arrForm.arrHidden}-->
         <input type="hidden" name="<!--{$key}-->" value="<!--{$item|h}-->" />
         <!--{/foreach}-->

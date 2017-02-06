@@ -91,6 +91,9 @@ class ContentsImageUpload extends SC_Plugin_Base
      */
     public function enable($arrPlugin, $objPluginInstaller = null)
     {
+        // テーブル作成
+        self::createTable();
+        
         // 有効時、プラグイン情報に値を入れたい場合使う
         self::updatePlugin($arrPlugin["plugin_code"], array(
             "free_field1" => "text1",
@@ -112,6 +115,9 @@ class ContentsImageUpload extends SC_Plugin_Base
      */
     public function disable($arrPlugin, $objPluginInstaller = null)
     {
+        // テーブル削除
+        self::dropTable();
+        
         // 無効時、プラグイン情報に値を初期化したい場合使う
         self::updatePlugin($arrPlugin["plugin_code"], array(
             "free_field1" => null,
@@ -133,7 +139,7 @@ class ContentsImageUpload extends SC_Plugin_Base
         $objHelperPlugin->addAction("loadClassFileChange", array(&$this, "loadClassFileChange"), $priority);
         $objHelperPlugin->addAction("prefilterTransform", array(&$this, "prefilterTransform"), $priority);
         $objHelperPlugin->addAction("outputfilterTransform", array(&$this, "outputfilterTransform"), $priority);
-        $objHelperPlugin->addAction("LC_Page_Admin_Contents_action_before", array(&$this, "admin_contents_action_before"), $priority);
+        $objHelperPlugin->addAction("LC_Page_Admin_Contents_action_after", array(&$this, "admin_contents_action_after"), $priority);
         
     }
 
@@ -150,7 +156,7 @@ class ContentsImageUpload extends SC_Plugin_Base
         
     }
     
-    public function admin_contents_action_before(LC_Page $objPage)
+    public function admin_contents_action_after(LC_Page $objPage)
     {
         $objFormParam = new SC_FormParam_Ex();
         
@@ -166,7 +172,7 @@ class ContentsImageUpload extends SC_Plugin_Base
                 $this->lfInitFormParam_UploadImage($objFormParam);
                 $this->lfInitFormParam($objFormParam, $_POST);
                 $arrForm = $objFormParam->getHashArray();
-
+                
                 switch ($mode) {
                     case 'upload_image':
                         // ファイルを一時ディレクトリにアップロード
@@ -179,15 +185,78 @@ class ContentsImageUpload extends SC_Plugin_Base
                     default:
                         break;
                 }
-
+                
                 // 入力画面表示設定
-                $this->arrForm = $this->lfSetViewParam_InputPage($objUpFile, $arrForm);
+                $objPage->arrForm = $this->lfSetViewParam_InputPage($objUpFile, $arrForm);
+
                 // ページonload時のJavaScript設定
-                $this->tpl_onload = $this->getAnchorHash($arrForm['image_key']);
+                $objPage->tpl_onload = $this->getAnchorHash($arrForm['image_key']);
+                break;
+            case 'edit':
+                // パラメーター初期化
+                $this->lfInitFormParam_UploadImage($objFormParam);
+                $this->lfInitFormParam($objFormParam, $_POST);
+                $arrForm = $this->lfSetViewParam_ConfirmPage($objUpFile, $objFormParam->getHashArray());
+                $objPage->arrForm = array_merge($objPage->arrForm, $arrForm);
+
+                if(!$objPage->arrErr) {
+                    //$this->doRegist($objPage->tpl_news_id, $objUpFile);
+
+                    // 一時ファイルを本番ディレクトリに移動する
+                    $this->lfSaveUploadFiles($objUpFile, $objPage->tpl_news_id);
+    
+                    
+                }
+                
+                print_r($objPage->arrForm);
+                
                 break;
             default:
                 break;
         }
+    }
+    
+    /**
+     * 登録処理を実行.
+     *
+     * @param  integer  $news_id
+     * @param  array    $sqlval
+     * @param  SC_Helper_News_Ex   $objNews
+     * @return multiple
+     */
+    public function doRegist($news_id, $objUpFile)
+    {
+        $sqlval['news_id'] = $news_id;
+        $sqlval = array_merge($sqlval, $objUpFile->getDBFileList());
+
+        return $this->saveNewImage($sqlval);
+    }
+    
+    /**
+     * ニュースの登録.
+     *
+     * @param  array    $sqlval
+     * @return multiple 登録成功:ニュースID, 失敗:FALSE
+     */
+    public function saveNewImage($sqlval)
+    {
+        $objQuery =& SC_Query_Ex::getSingletonInstance();
+
+        $news_id = $objQuery->get("news_id", "plg_news_image", "news_id", array($sqlval['news_id']));
+        
+        $sqlval['update_date'] = 'CURRENT_TIMESTAMP';
+        // 新規登録
+        if ($news_id == null) {
+            // INSERTの実行
+            $sqlval['create_date'] = 'CURRENT_TIMESTAMP';
+            $ret = $objQuery->insert('plg_news_image', $sqlval);
+        // 既存編集
+        } else {
+            $where = 'news_id = ?';
+            $ret = $objQuery->update('plg_news_image', $sqlval, $where, array($news_id));
+        }
+
+        return ($ret) ? $sqlval['news_id'] : FALSE;
     }
     
     /**
@@ -247,6 +316,93 @@ class ContentsImageUpload extends SC_Plugin_Base
         $arrForm['arrFile'] = $objUpFile->getFormFileList(IMAGE_TEMP_URLPATH, IMAGE_SAVE_URLPATH);
 
         return $arrForm;
+    }
+
+  /**
+     * 表示用フォームパラメーター取得
+     * - 確認画面
+     *
+     * @param  SC_UploadFile_Ex $objUpFile   SC_UploadFileインスタンス
+     * @param  SC_UploadFile_Ex $objDownFile SC_UploadFileインスタンス
+     * @param  array  $arrForm     フォーム入力パラメーター配列
+     * @return array  表示用フォームパラメーター配列
+     */
+    public function lfSetViewParam_ConfirmPage(&$objUpFile, &$arrForm)
+    {
+        // 画像ファイル用データ取得
+        $arrForm['arrFile'] = $objUpFile->getFormFileList(IMAGE_TEMP_URLPATH, IMAGE_SAVE_URLPATH);
+
+        return $arrForm;
+    }    
+    
+    /**
+     * アップロードファイルを保存する
+     *
+     * @param  object  $objUpFile   SC_UploadFileインスタンス
+     * @param  integer $news_id  ニュースID
+     * @return void
+     */
+    public function lfSaveUploadFiles(&$objUpFile, $news_id)
+    {
+        // TODO: SC_UploadFile::moveTempFileの画像削除条件見直し要
+        $objImage = new SC_Image_Ex($objUpFile->temp_dir);
+        $arrKeyName = $objUpFile->keyname;
+        $arrTempFile = $objUpFile->temp_file;
+        $arrSaveFile = $objUpFile->save_file;
+        $arrImageKey = array();
+        foreach ($arrTempFile as $key => $temp_file) {
+            if ($temp_file) {
+                $objImage->moveTempImage($temp_file, $objUpFile->save_dir);
+                $arrImageKey[] = $arrKeyName[$key];
+                if (!empty($arrSaveFile[$key])
+                    && !$this->lfHasSameNewsImage($news_id, $arrImageKey, $arrSaveFile[$key])
+                    && !in_array($temp_file, $arrSaveFile)
+                ) {
+                    $objImage->deleteImage($arrSaveFile[$key], $objUpFile->save_dir);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 同名画像ファイル登録の有無を確認する.
+     *
+     * 画像ファイルの削除可否判定用。
+     * 同名ファイルの登録がある場合には画像ファイルの削除を行わない。
+     * 戻り値： 同名ファイル有り(true) 同名ファイル無し(false)
+     *
+     * @param  string  $news_id         ニュースID
+     * @param  string  $arrImageKey     対象としない画像カラム名
+     * @param  string  $image_file_name 画像ファイル名
+     * @return boolean
+     */
+    public function lfHasSameNewsImage($news_id, $arrImageKey, $image_file_name)
+    {
+        if (!SC_Utils_Ex::sfIsInt($news_id)) return false;
+        if (!$arrImageKey) return false;
+        if (!$image_file_name) return false;
+
+        $arrWhere = array();
+        $sqlval = array('0', $news_id);
+        foreach ($arrImageKey as $image_key) {
+            $arrWhere[] = "{$image_key} = ?";
+            $sqlval[] = $image_file_name;
+        }
+        $where = implode(' OR ', $arrWhere);
+        $where = "del_flg = ? AND (($news_id <> ? AND ({$where}))";
+
+        $arrKeyName = $this->objUpFile->keyname;
+        foreach ($arrKeyName as $key => $keyname) {
+            if (in_array($keyname, $arrImageKey)) continue;
+            $where .= " OR {$keyname} = ?";
+            $sqlval[] = $image_file_name;
+        }
+        $where .= ')';
+
+        $objQuery =& SC_Query_Ex::getSingletonInstance();
+        $exists = $objQuery->exists('plg_news_image', $where, $sqlval);
+
+        return $exists;
     }
     
     /**
@@ -521,6 +677,54 @@ class ContentsImageUpload extends SC_Plugin_Base
         // モバイルテンプレートを削除。
         $target_dir = SC_Helper_PageLayout_Ex::getTemplatePath(DEVICE_TYPE_MOBILE);
         self::deleteDirectory($target_dir, $src_dir . "mobile");
+
+    }
+    
+    /**
+     * テーブルの追加
+     *
+     * @return void
+     */
+    public static function createTable()
+    {
+        $objQuery = & SC_Query_Ex::getSingletonInstance();
+        switch (DB_TYPE) {
+            case "pgsql":
+                $sql = <<< __EOS__
+                    CREATE TABLE plg_news_image (
+                    news_id int NOT NULL,
+                    news_image text,
+                    create_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_date timestamp NOT NULL,
+                    PRIMARY KEY (news_id)
+                    );
+__EOS__;
+                break;
+            case "mysql":
+                $sql = <<< __EOS__
+                    CREATE TABLE plg_news_image (
+                    news_id int NOT NULL,
+                    news_image text,
+                    create_date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_date timestamp NOT NULL,
+                    PRIMARY KEY (news_id)
+                    ) ENGINE=InnoDB ;
+__EOS__;
+                break;
+        }
+        $objQuery->query($sql);
+
+    }
+
+    /**
+     * テーブルの削除
+     *
+     * @return void
+     */
+    public static function dropTable()
+    {
+        $objQuery = & SC_Query_Ex::getSingletonInstance();
+        $objQuery->query("DROP TABLE plg_news_image");
 
     }
 
