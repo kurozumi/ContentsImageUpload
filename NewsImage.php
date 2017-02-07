@@ -193,13 +193,13 @@ class NewsImage extends SC_Plugin_Base {
                     if ($news_id) {
                         // 一時ファイルを本番ディレクトリに移動する
                         $this->lfSaveUploadFiles($objUpFile, $news_id);
-
-                        $this->lfGetFormParam_PreEdit($news_id);
+                        
+                        $this->lfGetFormParam_PreEdit($objUpFile, $news_id);
                     }
                 }
 
                 $arrForm['arrFile'] = $objUpFile->getFormFileList(IMAGE_TEMP_URLPATH, IMAGE_SAVE_URLPATH);
-
+                print_r($arrForm['arrFile']);
                 break;
             default:
                 break;
@@ -329,10 +329,8 @@ class NewsImage extends SC_Plugin_Base {
         // DBから商品データ取得
         $arrForm = $this->lfGetNewsImage_FromDB($news_id);
 
-        print_r($arrForm);
         // DBデータから画像ファイル名の読込
-        //if(is_array($arrForm))
-        //    $objUpFile->setDBFileList($arrForm[0]);
+        $objUpFile->setDBFileList($arrForm[0]);
 
         return $arrForm;
     }
@@ -355,7 +353,7 @@ __EOF__;
         $where = 'news_id = ?';
         $arrData = $objQuery->select($col, $table, $where, array($news_id));
 
-        return $arrData;
+        return $arrData[0];
     }
 
     /**
