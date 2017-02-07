@@ -31,19 +31,19 @@
  * @author LOCKON CO.,LTD.
  * @version $Id: $
  */
-class NewsImage extends SC_Plugin_Base
-{
+class NewsImage extends SC_Plugin_Base {
+
     /**
      * コンストラクタ
      *
      * @param  array $arrSelfInfo 自身のプラグイン情報
      * @return void
      */
-    public function __construct(array $arrSelfInfo)
-    {
+    public function __construct(array $arrSelfInfo) {
         // プラグインを有効化したときの初期設定をココに追加する
-        if($arrSelfInfo["enable"] == 1) {}
-
+        if ($arrSelfInfo["enable"] == 1) {
+            
+        }
     }
 
     /**
@@ -54,13 +54,11 @@ class NewsImage extends SC_Plugin_Base
      * @param  array $arrPlugin plugin_infoを元にDBに登録されたプラグイン情報(dtb_plugin)
      * @return void
      */
-    public function install($arrPlugin, $objPluginInstaller = null)
-    {
+    public function install($arrPlugin, $objPluginInstaller = null) {
         // htmlディレクトリにファイルを配置。
         $src_dir = PLUGIN_UPLOAD_REALDIR . "{$arrPlugin["plugin_code"]}/html/";
         $dest_dir = HTML_REALDIR;
         SC_Utils::copyDirectory($src_dir, $dest_dir);
-
     }
 
     /**
@@ -71,14 +69,11 @@ class NewsImage extends SC_Plugin_Base
      * @param  array $arrPlugin プラグイン情報の連想配列(dtb_plugin)
      * @return void
      */
-    public function uninstall($arrPlugin, $objPluginInstaller = null)
-    {
+    public function uninstall($arrPlugin, $objPluginInstaller = null) {
         // htmlディレクトリのファイルを削除。
         $target_dir = HTML_REALDIR;
         $source_dir = PLUGIN_UPLOAD_REALDIR . "{$arrPlugin["plugin_code"]}/html/";
         self::deleteDirectory($target_dir, $source_dir);
-
-
     }
 
     /**
@@ -89,11 +84,10 @@ class NewsImage extends SC_Plugin_Base
      * @param  array $arrPlugin プラグイン情報の連想配列(dtb_plugin)
      * @return void
      */
-    public function enable($arrPlugin, $objPluginInstaller = null)
-    {
+    public function enable($arrPlugin, $objPluginInstaller = null) {
         // テーブル作成
         self::createTable();
-        
+
         // 有効時、プラグイン情報に値を入れたい場合使う
         self::updatePlugin($arrPlugin["plugin_code"], array(
             "free_field1" => "text1",
@@ -101,7 +95,7 @@ class NewsImage extends SC_Plugin_Base
             "free_field3" => "text3",
             "free_field4" => "text4",
         ));
-        
+
         self::copyTemplate($arrPlugin);
     }
 
@@ -113,11 +107,10 @@ class NewsImage extends SC_Plugin_Base
      * @param  array $arrPlugin プラグイン情報の連想配列(dtb_plugin)
      * @return void
      */
-    public function disable($arrPlugin, $objPluginInstaller = null)
-    {
+    public function disable($arrPlugin, $objPluginInstaller = null) {
         // テーブル削除
         self::dropTable();
-        
+
         // 無効時、プラグイン情報に値を初期化したい場合使う
         self::updatePlugin($arrPlugin["plugin_code"], array(
             "free_field1" => null,
@@ -125,7 +118,7 @@ class NewsImage extends SC_Plugin_Base
             "free_field3" => null,
             "free_field4" => null,
         ));
-        
+
         self::deleteTemplate($arrPlugin);
     }
 
@@ -134,13 +127,11 @@ class NewsImage extends SC_Plugin_Base
      *
      * @param integer $priority
      */
-    public function register(SC_Helper_Plugin $objHelperPlugin, $priority)
-    {
+    public function register(SC_Helper_Plugin $objHelperPlugin, $priority) {
         $objHelperPlugin->addAction("loadClassFileChange", array(&$this, "loadClassFileChange"), $priority);
         $objHelperPlugin->addAction("prefilterTransform", array(&$this, "prefilterTransform"), $priority);
         $objHelperPlugin->addAction("outputfilterTransform", array(&$this, "outputfilterTransform"), $priority);
         $objHelperPlugin->addAction("LC_Page_Admin_Contents_action_after", array(&$this, "admin_contents_action_after"), $priority);
-        
     }
 
     /**
@@ -149,17 +140,14 @@ class NewsImage extends SC_Plugin_Base
      * @param type $classname
      * @param type $classpath
      */
-    public function loadClassFileChange(&$classname, &$classpath)
-    {
+    public function loadClassFileChange(&$classname, &$classpath) {
         $base_path = PLUGIN_UPLOAD_REALDIR . basename(__DIR__) . "/data/class/";
         $helper_path = $base_path . "helper/";
-        
     }
-    
-    public function admin_contents_action_after(LC_Page $objPage)
-    {
+
+    public function admin_contents_action_after(LC_Page $objPage) {
         $objFormParam = new SC_FormParam_Ex();
-        
+
         $objUpFile = new SC_UploadFile_Ex(IMAGE_TEMP_REALDIR, IMAGE_SAVE_REALDIR);
         $this->lfInitFile($objUpFile);
         $objUpFile->setHiddenFileList($_POST);
@@ -172,7 +160,7 @@ class NewsImage extends SC_Plugin_Base
                 $this->lfInitFormParam_UploadImage($objFormParam);
                 $this->lfInitFormParam($objFormParam, $_POST);
                 $arrForm = $objFormParam->getHashArray();
-                
+
                 switch ($mode) {
                     case 'upload_image':
                         // ファイルを一時ディレクトリにアップロード
@@ -185,7 +173,7 @@ class NewsImage extends SC_Plugin_Base
                     default:
                         break;
                 }
-                
+
                 // 入力画面表示設定
                 $objPage->arrForm = $this->lfSetViewParam_InputPage($objUpFile, $arrForm);
 
@@ -199,25 +187,25 @@ class NewsImage extends SC_Plugin_Base
                 $arrForm = $this->lfSetViewParam_InputPage($objUpFile, $objFormParam->getHashArray());
                 $objPage->arrForm = array_merge($objPage->arrForm, $arrForm);
 
-                if(!$objPage->arrErr) {
-                    //$this->doRegist($objPage->tpl_news_id, $objUpFile);
+                if (!$objPage->arrErr) {
+                    $news_id = $this->doRegist($objPage->tpl_news_id, $objUpFile);
 
-                    // 一時ファイルを本番ディレクトリに移動する
-                    $this->lfSaveUploadFiles($objUpFile, $objPage->tpl_news_id);
-    
-                    
+                    if ($news_id) {
+                        // 一時ファイルを本番ディレクトリに移動する
+                        $this->lfSaveUploadFiles($objUpFile, $news_id);
+
+                        $this->lfGetFormParam_PreEdit($news_id);
+                    }
                 }
-                
+
                 $arrForm['arrFile'] = $objUpFile->getFormFileList(IMAGE_TEMP_URLPATH, IMAGE_SAVE_URLPATH);
-                
-                print_r($objPage->arrForm);
-                
+
                 break;
             default:
                 break;
         }
     }
-    
+
     /**
      * 登録処理を実行.
      *
@@ -226,33 +214,30 @@ class NewsImage extends SC_Plugin_Base
      * @param  SC_Helper_News_Ex   $objNews
      * @return multiple
      */
-    public function doRegist($news_id, $objUpFile)
-    {
+    public function doRegist($news_id, $objUpFile) {
         $sqlval['news_id'] = $news_id;
         $sqlval = array_merge($sqlval, $objUpFile->getDBFileList());
 
         return $this->saveNewImage($sqlval);
     }
-    
+
     /**
      * ニュースの登録.
      *
      * @param  array    $sqlval
      * @return multiple 登録成功:ニュースID, 失敗:FALSE
      */
-    public function saveNewImage($sqlval)
-    {
-        $objQuery =& SC_Query_Ex::getSingletonInstance();
+    public function saveNewImage($sqlval) {
+        $objQuery = & SC_Query_Ex::getSingletonInstance();
 
-        $news_id = $objQuery->get("news_id", "plg_news_image", "news_id", array($sqlval['news_id']));
-        
+        $news_id = $objQuery->get("news_id", "plg_news_image", "news_id = ?", array($sqlval['news_id']));
         $sqlval['update_date'] = 'CURRENT_TIMESTAMP';
         // 新規登録
         if ($news_id == null) {
             // INSERTの実行
             $sqlval['create_date'] = 'CURRENT_TIMESTAMP';
             $ret = $objQuery->insert('plg_news_image', $sqlval);
-        // 既存編集
+            // 既存編集
         } else {
             $where = 'news_id = ?';
             $ret = $objQuery->update('plg_news_image', $sqlval, $where, array($news_id));
@@ -260,7 +245,7 @@ class NewsImage extends SC_Plugin_Base
 
         return ($ret) ? $sqlval['news_id'] : FALSE;
     }
-    
+
     /**
      * アップロードファイルパラメーター情報の初期化
      * - 画像ファイル用
@@ -268,11 +253,10 @@ class NewsImage extends SC_Plugin_Base
      * @param  SC_UploadFile_Ex $objUpFile SC_UploadFileインスタンス
      * @return void
      */
-    public function lfInitFile(&$objUpFile)
-    {
+    public function lfInitFile(&$objUpFile) {
         $objUpFile->addFile('画像', 'news_image', array('jpg', 'gif', 'png'), IMAGE_SIZE, false, NORMAL_IMAGE_WIDTH, NORMAL_IMAGE_WIDTH);
     }
-    
+
     /**
      * パラメーター情報の初期化
      * - 画像ファイルアップロードモード
@@ -280,28 +264,26 @@ class NewsImage extends SC_Plugin_Base
      * @param  SC_FormParam_Ex $objFormParam SC_FormParamインスタンス
      * @return void
      */
-    public function lfInitFormParam_UploadImage(&$objFormParam)
-    {
+    public function lfInitFormParam_UploadImage(&$objFormParam) {
         $objFormParam->addParam('image_key', 'image_key', '', '', array());
     }
-    
-   /**
+
+    /**
      * パラメーター情報の初期化
      *
      * @param  SC_FormParam_Ex $objFormParam SC_FormParamインスタンス
      * @param  array  $arrPost      $_POSTデータ
      * @return void
      */
-    public function lfInitFormParam(&$objFormParam, $arrPost)
-    {
+    public function lfInitFormParam(&$objFormParam, $arrPost) {
         $objFormParam->addParam('save_news_image', 'save_news_image', '', '', array());
         $objFormParam->addParam('temp_news_image', 'temp_news_image', '', '', array());
 
         $objFormParam->setParam($arrPost);
         $objFormParam->convParam();
     }
-    
-   /**
+
+    /**
      * 表示用フォームパラメーター取得
      * - 入力画面
      *
@@ -309,8 +291,7 @@ class NewsImage extends SC_Plugin_Base
      * @param  array  $arrForm     フォーム入力パラメーター配列
      * @return array  表示用フォームパラメーター配列
      */
-    public function lfSetViewParam_InputPage(&$objUpFile, &$arrForm)
-    {
+    public function lfSetViewParam_InputPage(&$objUpFile, &$arrForm) {
         // アップロードファイル情報取得(Hidden用)
         $arrForm['arrHidden'] = $objUpFile->getHiddenFileList();
 
@@ -320,7 +301,7 @@ class NewsImage extends SC_Plugin_Base
         return $arrForm;
     }
 
-  /**
+    /**
      * 表示用フォームパラメーター取得
      * - 確認画面
      *
@@ -329,14 +310,13 @@ class NewsImage extends SC_Plugin_Base
      * @param  array  $arrForm     フォーム入力パラメーター配列
      * @return array  表示用フォームパラメーター配列
      */
-    public function lfSetViewParam_ConfirmPage(&$objUpFile, &$arrForm)
-    {
+    public function lfSetViewParam_ConfirmPage(&$objUpFile, &$arrForm) {
         // 画像ファイル用データ取得
         $arrForm['arrFile'] = $objUpFile->getFormFileList(IMAGE_TEMP_URLPATH, IMAGE_SAVE_URLPATH);
 
         return $arrForm;
     }
-    
+
     /**
      * フォームパラメーター取得
      * - 編集/複製モード
@@ -345,82 +325,39 @@ class NewsImage extends SC_Plugin_Base
      * @param  integer $product_id  商品ID
      * @return array   フォームパラメーター配列
      */
-    public function lfGetFormParam_PreEdit(&$objUpFile, $news_id)
-    {
-        $arrForm = array();
-
+    public function lfGetFormParam_PreEdit(&$objUpFile, $news_id) {
         // DBから商品データ取得
-        $arrForm = $this->lfGetProductData_FromDB($news_id);
+        $arrForm = $this->lfGetNewsImage_FromDB($news_id);
+
+        print_r($arrForm);
         // DBデータから画像ファイル名の読込
-        $objUpFile->setDBFileList($arrForm);
+        //if(is_array($arrForm))
+        //    $objUpFile->setDBFileList($arrForm[0]);
 
         return $arrForm;
     }
-    
+
     /**
      * DBから商品データを取得する
      *
      * @param  integer $news_id ニュースID
      * @return string   商品データ配列
      */
-    public function lfGetProductData_FromDB($news_id)
-    {
-        $objQuery =& SC_Query_Ex::getSingletonInstance();
+    public function lfGetNewsImage_FromDB($news_id) {
+        $objQuery = & SC_Query_Ex::getSingletonInstance();
         $arrProduct = array();
 
         // 商品データ取得
         $col = '*';
         $table = <<< __EOF__
-            dtb_products AS T1
-            LEFT JOIN (
-                SELECT product_id AS product_id_sub,
-                    product_code,
-                    price01,
-                    price02,
-                    deliv_fee,
-                    stock,
-                    stock_unlimited,
-                    sale_limit,
-                    point_rate,
-                    product_type_id,
-                    down_filename,
-                    down_realfilename
-                FROM dtb_products_class
-            ) AS T2
-                ON T1.product_id = T2.product_id_sub
+            plg_news_image
 __EOF__;
-        $where = 'product_id = ?';
-        $objQuery->setLimit('1');
-        $arrProduct = $objQuery->select($col, $table, $where, array($product_id));
+        $where = 'news_id = ?';
+        $arrData = $objQuery->select($col, $table, $where, array($news_id));
 
-        // カテゴリID取得
-        $col = 'category_id';
-        $table = 'dtb_product_categories';
-        $where = 'product_id = ?';
-        $objQuery->setOption('');
-        $arrProduct[0]['category_id'] = $objQuery->getCol($col, $table, $where, array($product_id));
-
-        // 規格情報ありなしフラグ取得
-        $objDb = new SC_Helper_DB_Ex();
-        $arrProduct[0]['has_product_class'] = $objDb->sfHasProductClass($product_id);
-
-        // 規格が登録されていなければ規格ID取得
-        if ($arrProduct[0]['has_product_class'] == false) {
-            $arrProduct[0]['product_class_id'] = SC_Utils_Ex::sfGetProductClassId($product_id, '0', '0');
-        }
-
-        // 商品ステータス取得
-        $objProduct = new SC_Product_Ex();
-        $productStatus = $objProduct->getProductStatus(array($product_id));
-        $arrProduct[0]['product_status'] = $productStatus[$product_id];
-
-        // 関連商品データ取得
-        $arrRecommend = $this->lfGetRecommendProductsData_FromDB($product_id);
-        $arrProduct[0] = array_merge($arrProduct[0], $arrRecommend);
-
-        return $arrProduct[0];
+        return $arrData;
     }
-    
+
     /**
      * アップロードファイルを保存する
      *
@@ -428,8 +365,7 @@ __EOF__;
      * @param  integer $news_id  ニュースID
      * @return void
      */
-    public function lfSaveUploadFiles(&$objUpFile, $news_id)
-    {
+    public function lfSaveUploadFiles(&$objUpFile, $news_id) {
         // TODO: SC_UploadFile::moveTempFileの画像削除条件見直し要
         $objImage = new SC_Image_Ex($objUpFile->temp_dir);
         $arrKeyName = $objUpFile->keyname;
@@ -440,16 +376,14 @@ __EOF__;
             if ($temp_file) {
                 $objImage->moveTempImage($temp_file, $objUpFile->save_dir);
                 $arrImageKey[] = $arrKeyName[$key];
-                if (!empty($arrSaveFile[$key])
-                    && !$this->lfHasSameNewsImage($news_id, $arrImageKey, $arrSaveFile[$key])
-                    && !in_array($temp_file, $arrSaveFile)
+                if (!empty($arrSaveFile[$key]) && !$this->lfHasSameNewsImage($news_id, $arrImageKey, $arrSaveFile[$key]) && !in_array($temp_file, $arrSaveFile)
                 ) {
                     $objImage->deleteImage($arrSaveFile[$key], $objUpFile->save_dir);
                 }
             }
         }
     }
-    
+
     /**
      * 同名画像ファイル登録の有無を確認する.
      *
@@ -462,11 +396,13 @@ __EOF__;
      * @param  string  $image_file_name 画像ファイル名
      * @return boolean
      */
-    public function lfHasSameNewsImage($news_id, $arrImageKey, $image_file_name)
-    {
-        if (!SC_Utils_Ex::sfIsInt($news_id)) return false;
-        if (!$arrImageKey) return false;
-        if (!$image_file_name) return false;
+    public function lfHasSameNewsImage($news_id, $arrImageKey, $image_file_name) {
+        if (!SC_Utils_Ex::sfIsInt($news_id))
+            return false;
+        if (!$arrImageKey)
+            return false;
+        if (!$image_file_name)
+            return false;
 
         $arrWhere = array();
         $sqlval = array('0', $news_id);
@@ -479,18 +415,19 @@ __EOF__;
 
         $arrKeyName = $this->objUpFile->keyname;
         foreach ($arrKeyName as $key => $keyname) {
-            if (in_array($keyname, $arrImageKey)) continue;
+            if (in_array($keyname, $arrImageKey))
+                continue;
             $where .= " OR {$keyname} = ?";
             $sqlval[] = $image_file_name;
         }
         $where .= ')';
 
-        $objQuery =& SC_Query_Ex::getSingletonInstance();
+        $objQuery = & SC_Query_Ex::getSingletonInstance();
         $exists = $objQuery->exists('plg_news_image', $where, $sqlval);
 
         return $exists;
     }
-    
+
     /**
      * アップロードファイルパラメーター情報から削除
      * 一時ディレクトリに保存されている実ファイルも削除する
@@ -499,14 +436,14 @@ __EOF__;
      * @param  string $image_key 画像ファイルキー
      * @return void
      */
-    public function lfDeleteTempFile(&$objUpFile, $image_key)
-    {
+    public function lfDeleteTempFile(&$objUpFile, $image_key) {
         // TODO: SC_UploadFile::deleteFileの画像削除条件見直し要
         $arrTempFile = $objUpFile->temp_file;
         $arrKeyName = $objUpFile->keyname;
 
         foreach ($arrKeyName as $key => $keyname) {
-            if ($keyname != $image_key) continue;
+            if ($keyname != $image_key)
+                continue;
 
             if (!empty($arrTempFile[$key])) {
                 $temp_file = $arrTempFile[$key];
@@ -524,7 +461,7 @@ __EOF__;
             }
         }
     }
-    
+
     /**
      * アンカーハッシュ文字列を取得する
      * アンカーキーをサニタイジングする
@@ -532,8 +469,7 @@ __EOF__;
      * @param  string $anchor_key フォーム入力パラメーターで受け取ったアンカーキー
      * @return <type>
      */
-    public function getAnchorHash($anchor_key)
-    {
+    public function getAnchorHash($anchor_key) {
         if ($anchor_key != '') {
             return "location.hash='#" . htmlspecialchars($anchor_key) . "'";
         } else {
@@ -549,10 +485,9 @@ __EOF__;
      * @param string $filename
      * @return void
      */
-    public function prefilterTransform(&$source, LC_Page_Ex $objPage, $filename)
-    {
+    public function prefilterTransform(&$source, LC_Page_Ex $objPage, $filename) {
         $objTransform = new SC_Helper_Transform($source);
-       
+
         switch ($objPage->arrPageLayout['device_type_id']) {
             case DEVICE_TYPE_PC:
                 break;
@@ -573,7 +508,6 @@ __EOF__;
                 break;
         }
         $source = $objTransform->getHTML();
-
     }
 
     /**
@@ -585,8 +519,7 @@ __EOF__;
      * @param string $filename
      * @return void
      */
-    public function outputfilterTransform(&$source, LC_Page_Ex $objPage, $filename)
-    {
+    public function outputfilterTransform(&$source, LC_Page_Ex $objPage, $filename) {
         $objTransform = new SC_Helper_Transform($source);
         $template_dir = PLUGIN_UPLOAD_REALDIR . basename(__DIR__) . "/data/Smarty/templates/";
         switch ($objPage->arrPageLayout['device_type_id']) {
@@ -601,28 +534,26 @@ __EOF__;
                 break;
         }
         $source = $objTransform->getHTML();
-
     }
-    
+
     /**
      * プラグイン情報更新
      * 
      * @param string $plugin_code
      * @param array $free_fields
      */
-    public static function updatePlugin($plugin_code, array $free_fields){
+    public static function updatePlugin($plugin_code, array $free_fields) {
         $objQuery = & SC_Query_Ex::getSingletonInstance();
         $objQuery->update("dtb_plugin", $free_fields, "plugin_code = ?", array($plugin_code));
     }
-    
+
     /**
      * 次に割り当てるMasterDataのIDを取得する
      * 
      * @param string $mtb
      * @return int
      */
-    public static function getNextMasterDataId($mtb)
-    {
+    public static function getNextMasterDataId($mtb) {
         $objQuery = & SC_Query_Ex::getSingletonInstance();
         return $objQuery->max("id", $mtb) + 1;
     }
@@ -633,12 +564,11 @@ __EOF__;
      * @param string $mtb
      * @return int
      */
-    public static function getNextMasterDataRank($mtb)
-    {
+    public static function getNextMasterDataRank($mtb) {
         $objQuery = & SC_Query_Ex::getSingletonInstance();
         return $objQuery->max("rank", $mtb) + 1;
     }
-    
+
     /**
      * MasterDataに追加
      * 
@@ -646,23 +576,22 @@ __EOF__;
      * @param type $name
      * @return int
      */
-    public static function insertMasterDataId($mtb, $name, $id=null)
-    {
-        if(is_null($id))
+    public static function insertMasterDataId($mtb, $name, $id = null) {
+        if (is_null($id))
             $id = self::getNextMasterDataId($mtb);
 
         $objQuery = & SC_Query_Ex::getSingletonInstance();
         $objQuery->insert($mtb, array(
-            'id'   => $id,
+            'id' => $id,
             'name' => $name,
             'rank' => self::getNextMasterDataRank($mtb)));
 
         $masterData = new SC_DB_MasterData_Ex();
         $masterData->clearCache($mtb);
-        
+
         return $id;
     }
-    
+
     /**
      * MasterDataの指定IDを削除
      * 
@@ -670,25 +599,22 @@ __EOF__;
      * @param string $mtb
      * @param int $id
      */
-    public static function deleteMasterDataId($mtb, $id)
-    {
+    public static function deleteMasterDataId($mtb, $id) {
         $objQuery = & SC_Query_Ex::getSingletonInstance();
         $objQuery->delete($mtb, "id=?", array($id));
 
         $masterData = new SC_DB_MasterData_Ex();
         $masterData->clearCache($mtb);
-
     }
-    
+
     /**
      * 指定されたパスを比較して再帰的に削除します。
      * 
      * @param string $target_dir 削除対象のディレクトリ
      * @param string $source_dir 比較対象のディレクトリ
      */
-    public static function deleteDirectory($target_dir, $source_dir)
-    {
-        if($dir = opendir($source_dir)) {
+    public static function deleteDirectory($target_dir, $source_dir) {
+        if ($dir = opendir($source_dir)) {
             while ($name = readdir($dir)) {
                 if ($name == '.' || $name == '..') {
                     continue;
@@ -711,14 +637,13 @@ __EOF__;
             closedir($dir);
         }
     }
-    
+
     /**
      * 本体にテンプレートをコピー
      * 
      * @param type $arrPlugin
      */
-    public static function copyTemplate($arrPlugin)
-    {
+    public static function copyTemplate($arrPlugin) {
         $src_dir = PLUGIN_UPLOAD_REALDIR . "{$arrPlugin["plugin_code"]}/data/Smarty/templates/";
 
         // 管理画面テンプレートを配置。
@@ -736,7 +661,6 @@ __EOF__;
         // モバイルテンプレートを配置。
         $dest_dir = SC_Helper_PageLayout_Ex::getTemplatePath(DEVICE_TYPE_MOBILE);
         SC_Utils::copyDirectory($src_dir . "mobile/", $dest_dir);
-
     }
 
     /**
@@ -744,8 +668,7 @@ __EOF__;
      * 
      * @param type $arrPlugin
      */
-    public static function deleteTemplate($arrPlugin)
-    {
+    public static function deleteTemplate($arrPlugin) {
         $src_dir = PLUGIN_UPLOAD_REALDIR . "{$arrPlugin["plugin_code"]}/data/Smarty/templates/";
 
         // 管理画面テンプレートを削除。 
@@ -763,16 +686,14 @@ __EOF__;
         // モバイルテンプレートを削除。
         $target_dir = SC_Helper_PageLayout_Ex::getTemplatePath(DEVICE_TYPE_MOBILE);
         self::deleteDirectory($target_dir, $src_dir . "mobile");
-
     }
-    
+
     /**
      * テーブルの追加
      *
      * @return void
      */
-    public static function createTable()
-    {
+    public static function createTable() {
         $objQuery = & SC_Query_Ex::getSingletonInstance();
         switch (DB_TYPE) {
             case "pgsql":
@@ -799,7 +720,6 @@ __EOS__;
                 break;
         }
         $objQuery->query($sql);
-
     }
 
     /**
@@ -807,11 +727,9 @@ __EOS__;
      *
      * @return void
      */
-    public static function dropTable()
-    {
+    public static function dropTable() {
         $objQuery = & SC_Query_Ex::getSingletonInstance();
         $objQuery->query("DROP TABLE plg_news_image");
-
     }
 
 }
